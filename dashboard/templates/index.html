@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SurvilAI Dashboard</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>SurvilAI</strong><span>Local Security Dashboard</span></div>
+    <div id="health" class="pill">Checking…</div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><p class="eyebrow">EDGE-FIRST AI SECURITY</p><h1>Security Overview</h1><p>Local camera, identity and event visibility without a cloud AI dependency.</p></div>
+    </section>
+    <section class="cards">
+      <article><small>CAMERAS</small><strong id="camera-count">0</strong></article>
+      <article><small>IDENTITIES</small><strong id="people-count">0</strong></article>
+      <article><small>RECENT EVENTS</small><strong id="event-count">0</strong></article>
+    </section>
+    <section class="panel"><div class="panel-head"><h2>Recent Events</h2><button onclick="load()">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Camera</th><th>Person</th><th>Confidence</th><th>Track</th></tr></thead><tbody id="events"><tr><td colspan="6">Loading…</td></tr></tbody></table></div></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
