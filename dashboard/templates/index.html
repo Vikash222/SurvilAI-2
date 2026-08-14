@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SurvilAI Control Center</title><link rel="stylesheet" href="/static/app.css"></head>
 <body><header class="topbar"><div><strong>SurvilAI</strong><span>Local Security Control Center</span></div><div id="health" class="pill">Checking…</div></header>
-<main><section class="hero"><p class="eyebrow">EDGE-FIRST AI SECURITY</p><h1>Control Center</h1><p>Manage cameras and local identities from one private dashboard.</p></section>
+<main><section class="hero"><p class="eyebrow">EDGE-FIRST AI SECURITY</p><h1>Control Center</h1><p>Live local camera monitoring, identity management and event visibility.</p></section>
 <section class="cards"><article><small>CAMERAS</small><strong id="camera-count">0</strong></article><article><small>IDENTITIES</small><strong id="people-count">0</strong></article><article><small>RECENT EVENTS</small><strong id="event-count">0</strong></article></section>
-<div class="grid"><section class="panel"><div class="panel-head"><h2>Cameras</h2><button onclick="openModal('camera-modal')">+ Add Camera</button></div><div id="cameras" class="list"></div></section>
+<div class="grid"><section class="panel"><div class="panel-head"><h2>Live Cameras</h2><button onclick="openModal('camera-modal')">+ Add Camera</button></div><div id="cameras" class="camera-grid"></div></section>
 <section class="panel"><div class="panel-head"><h2>People</h2><button onclick="openModal('person-modal')">+ Add Person</button></div><div id="people" class="list"></div></section></div>
 <section class="panel"><div class="panel-head"><h2>Recent Events</h2><button onclick="load()">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Camera</th><th>Person</th><th>Confidence</th><th>Track</th></tr></thead><tbody id="events"><tr><td colspan="6">Loading…</td></tr></tbody></table></div></section></main>
 <div id="camera-modal" class="modal"><form class="dialog" onsubmit="addCamera(event)"><button type="button" class="close" onclick="closeModal('camera-modal')">×</button><h2>Add Camera</h2><label>Name<input id="camera-name" required placeholder="Gate 01"></label><label>Source<input id="camera-source" required placeholder="0 or rtsp://…"></label><button>Add Camera</button></form></div>
