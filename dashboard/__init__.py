@@ -1,0 +1,1 @@
+"""SurvilAI local dashboard package."""
