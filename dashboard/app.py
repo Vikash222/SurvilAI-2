@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 from survildb.database import SurvilDB
+from .camera_stream import CameraStream
 
 
 def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
@@ -17,12 +18,11 @@ def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify({"status": "ok", "database": "local"})
+        return jsonify({"status": "ok", "database": "local", "video": "mjpeg"})
 
     @app.get("/api/events")
     def events():
-        rows = db.recent_events(100)
-        return jsonify([dict(row) for row in rows])
+        return jsonify([dict(row) for row in db.recent_events(100)])
 
     @app.get("/api/cameras")
     def cameras():
@@ -64,10 +64,17 @@ def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
             return jsonify({"error": "person could not be created", "detail": str(exc)}), 409
         return jsonify({"id": person_id}), 201
 
+    @app.get("/video_feed/<int:camera_id>")
+    def video_feed(camera_id: int):
+        return Response(
+            CameraStream(db, camera_id).frames(),
+            mimetype="multipart/x-mixed-replace; boundary=frame",
+        )
+
     return app
 
 
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
