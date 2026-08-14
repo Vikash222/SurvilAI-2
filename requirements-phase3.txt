@@ -1,4 +1,4 @@
 torch>=2.4
- torchvision>=0.19
+torchvision>=0.19
 Pillow>=10.0
 numpy>=1.26
