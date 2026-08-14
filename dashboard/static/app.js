@@ -1,21 +1,9 @@
-async function get(path) { const r = await fetch(path); if (!r.ok) throw new Error(await r.text()); return r.json(); }
-
-function esc(v) { return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-async function load() {
-  try {
-    const [health, cameras, people, events] = await Promise.all([get('/api/health'), get('/api/cameras'), get('/api/people'), get('/api/events')]);
-    document.querySelector('#health').textContent = health.status === 'ok' ? '● Local / Online' : 'Offline';
-    document.querySelector('#camera-count').textContent = cameras.length;
-    document.querySelector('#people-count').textContent = people.length;
-    document.querySelector('#event-count').textContent = events.length;
-    const body = document.querySelector('#events');
-    body.innerHTML = events.length ? events.map(e => `<tr><td>${esc(e.occurred_at)}</td><td><span class="event">${esc(e.event_type)}</span></td><td>${esc(e.camera_id)}</td><td>${esc(e.person_id)}</td><td>${e.confidence == null ? '—' : Number(e.confidence).toFixed(3)}</td><td>${esc(e.track_id)}</td></tr>`).join('') : '<tr><td colspan="6">No events recorded.</td></tr>';
-  } catch (err) {
-    document.querySelector('#health').textContent = '● Dashboard error';
-    document.querySelector('#events').innerHTML = `<tr><td colspan="6">${esc(err.message)}</td></tr>`;
-  }
-}
-
-load();
-setInterval(load, 5000);
+async function get(path){const r=await fetch(path);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function send(path,method,body){const r=await fetch(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function openModal(id){document.getElementById(id).classList.add('open')}function closeModal(id){document.getElementById(id).classList.remove('open')}
+async function addCamera(e){e.preventDefault();try{await send('/api/cameras','POST',{name:document.getElementById('camera-name').value,source:document.getElementById('camera-source').value});e.target.reset();closeModal('camera-modal');await load()}catch(x){alert(x.message)}}
+async function addPerson(e){e.preventDefault();try{await send('/api/people','POST',{name:document.getElementById('person-name').value});e.target.reset();closeModal('person-modal');await load()}catch(x){alert(x.message)}}
+async function removeCamera(id){if(!confirm('Remove this camera?'))return;try{await send('/api/cameras/'+id,'DELETE');await load()}catch(x){alert(x.message)}}
+async function load(){try{const[h,c,p,ev]=await Promise.all([get('/api/health'),get('/api/cameras'),get('/api/people'),get('/api/events')]);document.querySelector('#health').textContent=h.status==='ok'?'● Local / Online':'Offline';document.querySelector('#camera-count').textContent=c.length;document.querySelector('#people-count').textContent=p.length;document.querySelector('#event-count').textContent=ev.length;document.querySelector('#cameras').innerHTML=c.length?c.map(x=>`<div class="item"><div><strong>${esc(x.name)}</strong><small>${esc(x.source)}</small></div><button class="danger" onclick="removeCamera(${x.id})">Remove</button></div>`).join(''):'<div class="empty">No cameras configured.</div>';document.querySelector('#people').innerHTML=p.length?p.map(x=>`<div class="item"><div><strong>${esc(x.name)}</strong><small>${x.active?'Active':'Inactive'}</small></div></div>`).join(''):'<div class="empty">No identities enrolled.</div>';document.querySelector('#events').innerHTML=ev.length?ev.map(x=>`<tr><td>${esc(x.occurred_at)}</td><td><span class="event">${esc(x.event_type)}</span></td><td>${esc(x.camera_id)}</td><td>${esc(x.person_id)}</td><td>${x.confidence==null?'—':Number(x.confidence).toFixed(3)}</td><td>${esc(x.track_id)}</td></tr>`).join(''):'<tr><td colspan="6">No events recorded.</td></tr>'}catch(x){document.querySelector('#health').textContent='● Dashboard error';document.querySelector('#events').innerHTML=`<tr><td colspan="6">${esc(x.message)}</td></tr>`}}
+load();setInterval(load,5000)
