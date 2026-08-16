@@ -22,3 +22,9 @@ snapshots/
 # IDE
 .vscode/
 .idea/
+
+# Personal face images
+data/faces/
+data/*.db
+my_photos/
+snapshots/
