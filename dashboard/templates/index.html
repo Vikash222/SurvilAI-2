@@ -1,11 +1,466 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SurvilAI Control Center</title><link rel="stylesheet" href="/static/app.css"></head>
-<body><header class="topbar"><div><strong>SurvilAI</strong><span>Local Security Control Center</span></div><div id="health" class="pill">Checking…</div></header>
-<main><section class="hero"><p class="eyebrow">EDGE-FIRST AI SECURITY</p><h1>Control Center</h1><p>Live local camera monitoring, identity management and event visibility.</p></section>
-<section class="cards"><article><small>CAMERAS</small><strong id="camera-count">0</strong></article><article><small>IDENTITIES</small><strong id="people-count">0</strong></article><article><small>RECENT EVENTS</small><strong id="event-count">0</strong></article></section>
-<div class="grid"><section class="panel"><div class="panel-head"><h2>Live Cameras</h2><button onclick="openModal('camera-modal')">+ Add Camera</button></div><div id="cameras" class="camera-grid"></div></section>
-<section class="panel"><div class="panel-head"><h2>People</h2><button onclick="openModal('person-modal')">+ Add Person</button></div><div id="people" class="list"></div></section></div>
-<section class="panel"><div class="panel-head"><h2>Recent Events</h2><button onclick="load()">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Camera</th><th>Person</th><th>Confidence</th><th>Track</th></tr></thead><tbody id="events"><tr><td colspan="6">Loading…</td></tr></tbody></table></div></section></main>
-<div id="camera-modal" class="modal"><form class="dialog" onsubmit="addCamera(event)"><button type="button" class="close" onclick="closeModal('camera-modal')">×</button><h2>Add Camera</h2><label>Name<input id="camera-name" required placeholder="Gate 01"></label><label>Source<input id="camera-source" required placeholder="0 or rtsp://…"></label><button>Add Camera</button></form></div>
-<div id="person-modal" class="modal"><form class="dialog" onsubmit="addPerson(event)"><button type="button" class="close" onclick="closeModal('person-modal')">×</button><h2>Add Person</h2><label>Name<input id="person-name" required placeholder="Person name"></label><button>Add Person</button></form></div>
-<script src="/static/app.js"></script></body></html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>SurvilAI — Security Control Center</title>
+
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+
+<body>
+
+<header class="topbar">
+
+    <div class="brand">
+        <div class="brand-icon">S</div>
+
+        <div>
+            <strong>SurvilAI</strong>
+            <span>Security Control Center</span>
+        </div>
+    </div>
+
+    <div class="system-status">
+        <span class="status-dot"></span>
+        <span id="health">Checking system...</span>
+    </div>
+
+</header>
+
+
+<main>
+
+    <!-- HERO -->
+
+    <section class="hero">
+
+        <div>
+            <p class="eyebrow">EDGE AI SECURITY PLATFORM</p>
+
+            <h1>Security Overview</h1>
+
+            <p class="hero-text">
+                Monitor cameras, identities and security events
+                from one local control center.
+            </p>
+        </div>
+
+        <div class="live-indicator">
+            <span></span>
+            LIVE MONITORING
+        </div>
+
+    </section>
+
+
+    <!-- STAT CARDS -->
+
+    <section class="cards">
+
+        <article class="stat-card">
+
+            <div class="stat-icon camera-icon">◉</div>
+
+            <div>
+                <small>CAMERAS</small>
+                <strong id="camera-count">0</strong>
+                <span>Connected devices</span>
+            </div>
+
+        </article>
+
+
+        <article class="stat-card">
+
+            <div class="stat-icon people-icon">♙</div>
+
+            <div>
+                <small>IDENTITIES</small>
+                <strong id="people-count">0</strong>
+                <span>Registered people</span>
+            </div>
+
+        </article>
+
+
+        <article class="stat-card">
+
+            <div class="stat-icon event-icon">⚡</div>
+
+            <div>
+                <small>RECENT EVENTS</small>
+                <strong id="event-count">0</strong>
+                <span>Detection records</span>
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <!-- CAMERAS + PEOPLE -->
+
+    <div class="grid">
+
+       <section class="panel cameras-panel">
+
+    <div class="panel-head">
+        <div>
+            <h2>Live Cameras</h2>
+            <p>Real-time camera monitoring</p>
+        </div>
+
+        <button class="primary-btn"
+                onclick="openModal('camera-modal')">
+            + Add Camera
+        </button>
+    </div>
+
+    <div class="camera-monitor">
+
+        <!-- CAMERA LIST -->
+        <div class="camera-list">
+
+            <div class="camera-list-header">
+                <span>CAMERAS</span>
+                <span id="camera-online-count">0 online</span>
+            </div>
+
+            <div id="cameras">
+                <div class="empty">
+                    Loading cameras...
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- SELECTED CAMERA -->
+        <div class="camera-preview">
+
+            <div class="preview-header">
+
+                <div>
+                    <div class="preview-title" id="selected-camera-name">
+                        Select a camera
+                    </div>
+
+                    <div class="preview-status">
+                        <span id="selected-status-dot"
+                              class="status-dot offline"></span>
+
+                        <span id="selected-camera-status">
+                            No camera selected
+                        </span>
+                    </div>
+                </div>
+
+                <button class="secondary-btn"
+                        id="fullscreen-btn"
+                        onclick="fullscreenCamera()"
+                        disabled>
+                    ⛶ Fullscreen
+                </button>
+
+            </div>
+
+
+            <div class="preview-screen">
+
+                <div id="preview-placeholder"
+                     class="preview-placeholder">
+
+                    <div class="preview-icon">◉</div>
+
+                    <strong>Select a camera</strong>
+
+                    <span>
+                        Choose a camera from the list to start live monitoring.
+                    </span>
+
+                </div>
+
+                <img id="selected-camera-stream"
+                     class="selected-camera-stream"
+                     alt="Selected camera live stream"
+                     style="display:none;">
+
+                <div id="preview-live-badge"
+                     class="preview-live-badge"
+                     style="display:none;">
+                    <span></span>
+                    LIVE
+                </div>
+
+            </div>
+
+
+            <div class="preview-footer">
+
+                <div>
+                    <small>CAMERA</small>
+                    <strong id="preview-camera-id">—</strong>
+                </div>
+
+                <div>
+                    <small>SOURCE</small>
+                    <strong id="preview-camera-source">—</strong>
+                </div>
+
+                <button class="danger"
+                        id="selected-remove-btn"
+                        onclick="removeSelectedCamera()"
+                        disabled>
+                    Remove
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+        <section class="panel people-panel">
+
+            <div class="panel-head">
+
+                <div>
+                    <h2>People</h2>
+                    <p>Registered identities</p>
+                </div>
+
+                <button class="primary-btn"
+                        onclick="openModal('person-modal')">
+                    + Add Person
+                </button>
+
+            </div>
+
+            <div class="people-table-wrap">
+
+    <table class="people-table">
+
+        <thead>
+            <tr>
+                <th>NAME</th>
+                <th>ROLL NUMBER</th>
+                <th>IMAGES</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+            </tr>
+        </thead>
+
+        <tbody id="people">
+            <tr>
+                <td colspan="5" class="loading">
+                    Loading people...
+                </td>
+            </tr>
+        </tbody>
+
+    </table>
+
+</div>
+
+        </section>
+
+    </div>
+
+
+    <!-- EVENTS -->
+
+    <section class="panel events-panel">
+
+        <div class="panel-head">
+
+            <div>
+                <h2>Recent Events</h2>
+                <p>Latest AI detection activity</p>
+            </div>
+
+            <button class="secondary-btn"
+                    onclick="load()">
+                ↻ Refresh
+            </button>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                <tr>
+                    <th>TIME</th>
+                    <th>EVENT</th>
+                    <th>CAMERA</th>
+                    <th>PERSON</th>
+                    <th>CONFIDENCE</th>
+                    <th>SNAPSHOT</th>
+                </tr>
+
+                </thead>
+
+                <tbody id="events">
+
+                <tr>
+                    <td colspan="6" class="loading">
+                        Loading events...
+                    </td>
+                </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<!-- ADD CAMERA MODAL -->
+
+<div id="camera-modal" class="modal">
+
+    <form class="dialog" onsubmit="addCamera(event)">
+
+        <button type="button"
+                class="close"
+                onclick="closeModal('camera-modal')">
+            ×
+        </button>
+
+        <div class="modal-title">
+            <span>📹</span>
+
+            <div>
+                <h2>Add Camera</h2>
+                <p>Connect a local or IP camera</p>
+            </div>
+        </div>
+
+        <label>
+            Camera Name
+
+            <input id="camera-name"
+                   required
+                   placeholder="Gate Camera 01">
+        </label>
+
+        <label>
+            Camera Source
+
+            <input id="camera-source"
+                   required
+                   placeholder="0 or rtsp://...">
+        </label>
+
+        <button class="primary-btn full-btn">
+            Add Camera
+        </button>
+
+    </form>
+
+</div>
+
+
+<!-- ADD PERSON MODAL -->
+
+<div id="person-modal" class="modal">
+
+    <form class="dialog" onsubmit="addPerson(event)">
+
+        <button type="button"
+                class="close"
+                onclick="closeModal('person-modal')">
+            ×
+        </button>
+
+        <div class="modal-title">
+
+            <span>👤</span>
+
+            <div>
+                <h2>Add Person</h2>
+                <p>Add a registered identity</p>
+            </div>
+
+        </div>
+
+        <label>
+            Person Name
+
+            <input id="person-name"
+                   required
+                   placeholder="Person name">
+        </label>
+
+        <label>
+            Roll Number
+
+            <input id="person-roll"
+                   required
+                   placeholder="23CSE001">
+        </label>
+
+        <button class="primary-btn full-btn">
+            Add Person
+        </button>
+
+    </form>
+
+</div>
+
+
+<!-- SNAPSHOT PREVIEW MODAL -->
+
+<div id="snapshot-modal"
+     class="modal snapshot-modal">
+
+    <div class="snapshot-dialog">
+
+        <button type="button"
+                class="close"
+                onclick="closeModal('snapshot-modal')">
+            ×
+        </button>
+
+        <div class="snapshot-header">
+
+            <div>
+                <span class="eyebrow">EVENT SNAPSHOT</span>
+                <h2>Detection Preview</h2>
+            </div>
+
+        </div>
+
+        <div class="snapshot-image-container">
+
+            <img id="snapshot-image"
+                 src=""
+                 alt="Event snapshot">
+
+        </div>
+
+        <div id="snapshot-info"
+             class="snapshot-info">
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="/static/app.js"></script>
+
+</body>
+</html>

@@ -226,10 +226,15 @@ class LiveRecognizer:
                 mean_vec=mean_vec,
                 all_vecs=vecs,
             )
-            # Fixed recognition threshold.
-            # Adaptive threshold was producing 1.0000 and rejecting
-            # valid live matches with scores around 0.60-0.70.
-            entry.adaptive_threshold = self.base_threshold
+            # Adaptive threshold: tighter when intra-class variance is low
+            if len(vecs) >= 2:
+                intra_sims = [float(np.dot(mean_vec, v)) for v in vecs]
+                entry.adaptive_threshold = max(
+                    self.base_threshold,
+                    float(np.mean(intra_sims)) - 2.0 * float(np.std(intra_sims)),
+                )
+            else:
+                entry.adaptive_threshold = self.base_threshold
 
             # Mahalanobis inverse-covariance (needs ≥ d+1 samples, min 3)
             if len(vecs) >= 3:
@@ -434,78 +439,3 @@ class LiveRecognizer:
     def match_batch(self, faces: List[np.ndarray]) -> List[Match]:
         """Process a list of face crops (e.g. all detections in one frame)."""
         return [self.match(f) for f in faces]
-class TemporalSmoother:
-    """Sliding-window temporal smoothing for face recognition."""
-
-    def __init__(self, window: int = 7, min_votes: int = 4):
-        self.window = window
-        self.min_votes = min_votes
-        self._buf: Deque[Match] = deque(maxlen=window)
-
-    def push(self, match: Match) -> Match:
-        self._buf.append(match)
-        return self._decide()
-
-    def _decide(self) -> Match:
-        if not self._buf:
-            return Match(
-                None,
-                "Unknown",
-                0.0,
-                0.0,
-                "temporal_empty",
-            )
-
-        # --------------------------------------------------
-        # IMPORTANT:
-        # Unknown should NOT compete equally with known IDs.
-        # --------------------------------------------------
-        known_matches = [
-            m for m in self._buf
-            if m.person_id is not None
-        ]
-
-        # If current frame is a confident known match,
-        # prefer it when enough known evidence exists.
-        if len(known_matches) >= self.min_votes:
-            vote_scores: Dict[int, List[float]] = defaultdict(list)
-            vote_names: Dict[int, str] = {}
-
-            for m in known_matches:
-                vote_scores[m.person_id].append(m.score)
-                vote_names[m.person_id] = m.name
-
-            winner_id = max(
-                vote_scores,
-                key=lambda pid: (
-                    len(vote_scores[pid]),
-                    np.mean(vote_scores[pid]),
-                ),
-            )
-
-            mean_score = float(np.mean(vote_scores[winner_id]))
-
-            return Match(
-                person_id=winner_id,
-                name=vote_names[winner_id],
-                score=mean_score,
-                quality=self._buf[-1].quality,
-                method="temporal_vote",
-            )
-
-        # --------------------------------------------------
-        # Not enough known votes:
-        # trust the latest recognition result.
-        # --------------------------------------------------
-        latest = self._buf[-1]
-
-        return Match(
-            person_id=latest.person_id,
-            name=latest.name,
-            score=latest.score,
-            quality=latest.quality,
-            method="temporal_latest",
-        )
-
-    def reset(self) -> None:
-        self._buf.clear()
