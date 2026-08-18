@@ -70,3 +70,4 @@ The recognition implementation is intentionally an adapter. Phase 1 does **not**
 ## Commercialization note
 
 Before any commercial release, all model weights, datasets, dependencies, and licenses must be reviewed for commercial use and redistribution. Privacy, retention, access control, and applicable data-protection requirements will be designed into later phases.
+# SurvilAI-2
