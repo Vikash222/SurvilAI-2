@@ -42,8 +42,14 @@ def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
 
     checkpoint = os.getenv(
         "SURVILAI_CHECKPOINT",
-        "models/survil-face-v1.pt",
+        "models/yolo26-face-v1.pt",
     )
+
+    # Get embedding model type
+    embedding_model = os.getenv(
+        "SURVILAI_EMBEDDING_MODEL",
+        "yolo26"  # "survilface" or "yolo26"
+    ).lower()
 
     recognizer = LiveRecognizer(
         db,
@@ -60,6 +66,7 @@ def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
                 "0.25",
             )
         ),
+        model_type=embedding_model,
     )
 
     face_detector = cv2.CascadeClassifier(
@@ -88,6 +95,11 @@ def create_app(db_path: str | Path = "data/survilai.db") -> Flask:
     @app.get("/")
     def index():
         return render_template("index.html")
+
+    @app.get("/yolo26")
+    def yolo26():
+        """YOLO26 WebGPU real-time object detection & pose estimation demo"""
+        return render_template("yolo26.html")
 
     # =========================================================
     # HEALTH

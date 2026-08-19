@@ -1,0 +1,20 @@
+{
+  "settings_version": "0.0.7",
+  "datasets_dir": "/Users/vikashkumar/Desktop/SurvilAI 2/datasets",
+  "weights_dir": "/Users/vikashkumar/Desktop/SurvilAI 2/weights",
+  "runs_dir": "/Users/vikashkumar/Desktop/SurvilAI 2/runs",
+  "uuid": "d4297e2bf5164129532e23de31af34c0807aff13e6a0358506deb85dee7e5103",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}

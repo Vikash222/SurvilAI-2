@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from survildb.database import SurvilDB
-from .model import SurvilFaceNet
+from .model import SurvilFaceNet, YOLO26EmbeddingModel
 
 logger = logging.getLogger(__name__)
 
@@ -69,26 +69,68 @@ class FaceQualityEstimator:
 # ──────────────────────────────────────────────
 
 class FacePreprocessor:
-    """CLAHE + z-score — far more robust than raw /255."""
+    """Preprocess face crops for SurvilFaceNet and YOLO26."""
 
     def __init__(self, target_size: int = 112):
         self.target_size = target_size
-        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        self.clahe = cv2.createCLAHE(
+            clipLimit=2.0,
+            tileGridSize=(8, 8),
+        )
 
-    def __call__(self, face: np.ndarray) -> Tuple[torch.Tensor, np.ndarray]:
-        """Returns (tensor [1,1,H,W] float32), gray uint8 for quality check."""
-        gray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY) if face.ndim == 3 else face.copy()
-        gray = cv2.resize(gray, (self.target_size, self.target_size),
-                          interpolation=cv2.INTER_AREA)
+    def __call__(
+        self,
+        face: np.ndarray,
+    ) -> Tuple[torch.Tensor, np.ndarray]:
+        """Return model tensor and grayscale image for quality scoring."""
+
+        if face is None or face.size == 0:
+            raise ValueError("Empty face image")
+
+        # Quality assessment uses grayscale.
+        gray = (
+            cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
+            if face.ndim == 3
+            else face.copy()
+        )
+
+        gray = cv2.resize(
+            gray,
+            (self.target_size, self.target_size),
+            interpolation=cv2.INTER_AREA,
+        )
+
         enhanced = self.clahe.apply(gray)
 
-        # z-score normalisation per image
-        arr = enhanced.astype(np.float32)
-        mu, sigma = arr.mean(), arr.std() + 1e-6
-        arr = (arr - mu) / sigma
+        # YOLO26 requires a 3-channel image.
+        if face.ndim == 3:
+            rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+        else:
+            rgb = cv2.cvtColor(face, cv2.COLOR_GRAY2RGB)
 
-        tensor = torch.from_numpy(arr)[None, None]   # (1,1,H,W)
-        return tensor, gray
+        # YOLO26 embedding model was trained at 224x224.
+        rgb = cv2.resize(
+            rgb,
+            (224, 224),
+            interpolation=cv2.INTER_AREA,
+        )
+
+        rgb = rgb.astype(np.float32) / 255.0
+
+        # ImageNet normalization used by the training dataset.
+        rgb = (rgb - np.array(
+            [0.485, 0.456, 0.406],
+            dtype=np.float32,
+        )) / np.array(
+            [0.229, 0.224, 0.225],
+            dtype=np.float32,
+        )
+
+        tensor = torch.from_numpy(
+            rgb
+        ).permute(2, 0, 1).unsqueeze(0).float()
+
+        return tensor, enhanced
 
 
 # ──────────────────────────────────────────────
@@ -165,20 +207,45 @@ class LiveRecognizer:
         margin_threshold: float = 0.08,
         temporal_window: int = 7,
         use_faiss: bool = False,
+        model_type: str = "survilface",  # "survilface" or "yolo26"
     ):
         self.db = db
         self.base_threshold = float(threshold)
         self.quality_threshold = float(quality_threshold)
         self.margin_threshold = float(margin_threshold)
         self.use_faiss = use_faiss
+        self.model_type = model_type.lower()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = (
-            SurvilFaceNet.from_checkpoint(str(checkpoint), map_location=str(self.device))
-            .to(self.device)
-        )
+        
+        # Model selection
+        if self.model_type == "yolo26":
+            try:
+                # YOLO26 uses pretrained yolov8m.pt weights directly. The
+                # SurvilFaceNet checkpoint is a different model and must not
+                # be loaded into this wrapper.
+                self.model = YOLO26EmbeddingModel(
+                    model_name="yolov8m",
+                    embedding_dim=512,
+                    device=str(self.device),
+                )
+                logger.info("[LiveRecognizer] Using YOLO26 embedding model on %s", self.device)
+            except Exception as e:
+                logger.warning("[LiveRecognizer] YOLO26 model failed: %s, falling back to SurvilFaceNet", e)
+                self.model_type = "survilface"
+                self.model = (
+                    SurvilFaceNet.from_checkpoint(str(checkpoint), map_location=str(self.device))
+                    .to(self.device)
+                )
+                logger.info("[LiveRecognizer] Fallback: Using SurvilFaceNet on %s", self.device)
+        else:
+            self.model = (
+                SurvilFaceNet.from_checkpoint(str(checkpoint), map_location=str(self.device))
+                .to(self.device)
+            )
+            logger.info("[LiveRecognizer] Using SurvilFaceNet on %s", self.device)
+        
         self.model.eval()
-        logger.info("Model loaded on %s", self.device)
 
         self.preprocessor = FacePreprocessor()
         self.quality_estimator = FaceQualityEstimator()
@@ -275,7 +342,17 @@ class LiveRecognizer:
         quality = self.quality_estimator(gray)
 
         tensor = tensor.to(self.device)
-        vec = self.model(tensor, classify=False)[0].cpu().numpy().astype(np.float32)
+
+        if self.model_type == "yolo26":
+            # YOLO26EmbeddingModel directly returns a normalized
+            # embedding tensor of shape (B, embedding_dim).
+            vec = self.model(tensor)[0]
+        else:
+            # SurvilFaceNet legacy interface.
+            vec = self.model(tensor, classify=False)[0]
+
+        vec = vec.detach().cpu().numpy().astype(np.float32)
+
         return self._l2_norm(vec), quality
 
     # ── Scoring ─────────────────────────────────────────────────────────

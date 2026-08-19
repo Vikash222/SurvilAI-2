@@ -108,6 +108,34 @@ body {
 }
 
 /* =========================
+   TOPBAR NAV
+========================= */
+
+.topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.topbar-link {
+    color: #b9c5d6;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 8px 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(255,255,255,.04);
+    transition: all 0.2s ease;
+}
+
+.topbar-link:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(109,124,255,.15);
+}
+
+/* =========================
    SYSTEM STATUS
 ========================= */
 
@@ -136,6 +164,36 @@ body {
     border-radius: 50%;
     background: var(--success);
 
+    box-shadow: 0 0 12px rgba(53,212,154,.7);
+}
+
+/* =========================
+   SYSTEM STATUS
+========================= */
+
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 8px 13px;
+
+    color: #b9c5d6;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    border: 1px solid var(--border);
+    border-radius: 999px;
+
+    background: rgba(255,255,255,.035);
+}
+
+.system-status .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
     box-shadow: 0 0 12px rgba(53,212,154,.7);
 }
 

@@ -335,3 +335,99 @@ class HaarFaceDetector:
         y2 = min(fh, box.y + box.height)
         face_img = frame[y1:y2, x1:x2]
         return upscale_face(face_img)
+
+
+# ---------------------------------------------------------------------------
+# YOLO26 Detector (Real-time person detection)
+# ---------------------------------------------------------------------------
+
+class YOLO26Detector:
+    """
+    YOLO26 (YOLOv8/v10) based person detector.
+    
+    Replaces InsightFace for general object/person detection.
+    - Detects persons from COCO dataset (class 0)
+    - No facial landmarks, but much faster than InsightFace
+    - Better for crowded scenes, full-body detection
+    - Can detect people from head to toe, not just faces
+    
+    Install: pip install ultralytics
+    """
+
+    def __init__(self, model_name: str = "yolov8m", device: str = "cpu") -> None:
+        try:
+            from ultralytics import YOLO
+            self.model = YOLO(f"{model_name}.pt")
+            self.model.to(device)
+            self._available = True
+            self.device = device
+            # COCO class 0 = person
+            self.person_class_id = 0
+        except ImportError:
+            print("[SurvilAI] ultralytics not installed — YOLO26 detector unavailable")
+            self._available = False
+            self._fallback = HaarFaceDetector()
+
+    def detect(self, frame: np.ndarray, camera_id: str = "") -> list[FaceBox]:
+        """
+        Detect persons using YOLO26.
+        Returns FaceBox objects (reusing data structure for compatibility).
+        Note: No landmarks provided by YOLO, so require_landmarks will be False.
+        """
+        # Problem #17 — Skip blurry frames
+        if is_blurry(frame):
+            return []
+
+        # Problem #15 — CLAHE preprocessing
+        processed = apply_clahe(frame)
+
+        if not self._available:
+            return self._fallback.detect(processed, camera_id)
+
+        # Run YOLO26 inference
+        results = self.model(processed, conf=0.5, verbose=False)
+        boxes: list[FaceBox] = []
+
+        for result in results:
+            if result.boxes is None:
+                continue
+
+            for box_obj in result.boxes:
+                # Extract box coordinates
+                x1, y1, x2, y2 = map(int, box_obj.xyxy[0])
+                w, h = x2 - x1, y2 - y1
+                conf = float(box_obj.conf[0])
+                class_id = int(box_obj.cls[0])
+
+                # Only keep person detections (class 0 in COCO)
+                if class_id != self.person_class_id:
+                    continue
+
+                box = FaceBox(
+                    x=x1,
+                    y=y1,
+                    width=w,
+                    height=h,
+                    confidence=conf,
+                    landmarks=None  # YOLO26 doesn't provide landmarks
+                )
+
+                # Validate box (landmarks not required for YOLO)
+                valid, reason = validate_box(box, camera_id, require_landmarks=False)
+                if valid:
+                    boxes.append(box)
+
+        return boxes
+
+    def extract_face_image(self, frame: np.ndarray, box: FaceBox) -> np.ndarray:
+        """
+        Crop person region from frame.
+        Problem #16 — upscale for better embedding quality.
+        """
+        fh, fw = frame.shape[:2]
+        x1 = max(0, box.x)
+        y1 = max(0, box.y)
+        x2 = min(fw, box.x + box.width)
+        y2 = min(fh, box.y + box.height)
+        person_img = frame[y1:y2, x1:x2]
+        return upscale_face(person_img)

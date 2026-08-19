@@ -33,3 +33,20 @@ data/faces/
 data/*.db
 my_photos/
 snapshots/
+
+# ML model weights
+*.pt
+*.pth
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# Runtime/generated data
+runs/
+snapshots/
+my_photos/

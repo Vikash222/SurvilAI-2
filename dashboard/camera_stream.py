@@ -14,6 +14,7 @@ except ImportError:
 
 from survildb.database import SurvilDB
 from survilai.live_recognition import LiveRecognizer
+from survilai.core.detection import YOLO26Detector, HaarFaceDetector, InsightFaceDetector
 
 
 class CameraStream:
@@ -23,17 +24,42 @@ class CameraStream:
         self.db = db
         self.camera_id = camera_id
 
-        self.cascade = cv2.CascadeClassifier(
-            str(
-                Path(cv2.data.haarcascades)
-                / "haarcascade_frontalface_default.xml"
-            )
-        )
+        # Get detector type from environment
+        detector_type = os.getenv(
+            "SURVILAI_DETECTOR",
+            "yolo26"  # Default to YOLO26
+        ).lower()
+
+        # Initialize detector
+        if detector_type == "yolo26":
+            try:
+                self.detector = YOLO26Detector(model_name="yolov8m", device="cpu")
+                print(f"[CameraStream] Using YOLO26 detector")
+            except Exception as e:
+                print(f"[CameraStream] YOLO26 init failed: {e} → falling back to Haar")
+                self.detector = HaarFaceDetector()
+        elif detector_type == "insightface":
+            try:
+                self.detector = InsightFaceDetector()
+                print(f"[CameraStream] Using InsightFace detector")
+            except Exception as e:
+                print(f"[CameraStream] InsightFace init failed: {e} → falling back to Haar")
+                self.detector = HaarFaceDetector()
+        else:
+            # Default fallback
+            self.detector = HaarFaceDetector()
+            print(f"[CameraStream] Using Haar detector (default)")
 
         checkpoint = os.getenv(
             "SURVILAI_CHECKPOINT",
-            "models/survil-face-v1.pt",
+            "models/yolo26-face-v1.pt",
         )
+
+        # Get embedding model type
+        embedding_model = os.getenv(
+            "SURVILAI_EMBEDDING_MODEL",
+            "yolo26"  # "survilface" or "yolo26"
+        ).lower()
 
         self.recognizer = None
 
@@ -47,6 +73,7 @@ class CameraStream:
     quality_threshold=float(
         os.getenv("SURVILAI_QUALITY_THRESHOLD", "0.25")
     ),
+    model_type=embedding_model,
 )
         # ---------------------------------------------------------
         # EVENT COOLDOWN
@@ -375,40 +402,20 @@ class CameraStream:
                     cv2.COLOR_BGR2GRAY,
                 )
 
-                faces = self.cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=1.1,
-                    minNeighbors=self.face_min_neighbors,
-                    minSize=(
-                        self.face_min_size,
-                        self.face_min_size,
-                    ),
-                )
+                # Use configured detector (YOLO26, InsightFace, or Haar)
+                boxes = self.detector.detect(frame, camera_id=str(self.camera_id))
 
                 # -------------------------------------------------
                 # FACE PROCESSING
                 # -------------------------------------------------
 
-                for x, y, w, h in faces:
+                for box in boxes:
 
-                    # ---------------------------------------------
-                    # FACE QUALITY / FALSE-POSITIVE FILTER
-                    # ---------------------------------------------
-                    # Do not send tiny or obviously invalid Haar
-                    # detections to the recognition model.
-                    if (
-                        w < self.face_min_size
-                        or h < self.face_min_size
-                    ):
-                        continue
-
-                    aspect_ratio = w / float(h)
-                    if aspect_ratio < 0.55 or aspect_ratio > 1.80:
-                        continue
-
+                    # Box validation already done in detector
+                    # Extract face region
                     face_crop = frame[
-                        y : y + h,
-                        x : x + w,
+                        box.y : box.y + box.height,
+                        box.x : box.x + box.width,
                     ]
 
                     if face_crop.size == 0:
@@ -433,11 +440,18 @@ class CameraStream:
                     person_id = None
                     score = None
 
-                    # ---------------------------------------------
+                    # Extract face for recognition using detector's extract_face_image
+                    # This applies upscaling if needed
+                    try:
+                        face_for_embedding = self.detector.extract_face_image(frame, box)
+                    except Exception:
+                        face_for_embedding = face_crop
+
+                    # ----------------------------------------
                     # LOCAL FACE RECOGNITION
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     if self.recognizer is not None:
-                        match = self.recognizer.match(face_crop)
+                        match = self.recognizer.match(face_for_embedding)
 
                         label = (
                             f"{match.name} "
@@ -447,13 +461,13 @@ class CameraStream:
                         person_id = match.person_id
                         score = match.score
 
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     # DRAW VALID FACE BOX
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     cv2.rectangle(
                         frame,
-                        (x, y),
-                        (x + w, y + h),
+                        (box.x, box.y),
+                        (box.x + box.width, box.y + box.height),
                         (255, 255, 255),
                         2,
                     )
@@ -462,8 +476,8 @@ class CameraStream:
                         frame,
                         label,
                         (
-                            x,
-                            max(20, y - 8),
+                            box.x,
+                            max(20, box.y - 8),
                         ),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.55,
@@ -471,20 +485,20 @@ class CameraStream:
                         1,
                     )
 
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     # UNKNOWN / UNRECOGNIZED FACE
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     # An unknown detection is NOT stored as an event
-                    # immediately. This prevents random Haar boxes
+                    # immediately. This prevents random detections
                     # from filling Recent Events.
                     if person_id is None:
                         continue
 
                     now = time.monotonic()
 
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     # MULTI-FRAME CONFIRMATION
-                    # ---------------------------------------------
+                    # ----------------------------------------
                     # One accidental recognition is not enough.
                     pending = self.pending_matches.get(person_id)
 
@@ -497,7 +511,7 @@ class CameraStream:
                             "count": 0,
                             "last_seen": now,
                             "score": 0.0,
-                            "bbox": [x, y, w, h],
+                            "bbox": [box.x, box.y, box.width, box.height],
                         }
 
                     pending["count"] = int(pending["count"]) + 1
@@ -506,7 +520,7 @@ class CameraStream:
                         float(pending["score"]),
                         float(score or 0.0),
                     )
-                    pending["bbox"] = [x, y, w, h]
+                    pending["bbox"] = [box.x, box.y, box.width, box.height]
                     self.pending_matches[person_id] = pending
 
                     # Not confirmed yet.

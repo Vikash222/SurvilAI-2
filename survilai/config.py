@@ -8,6 +8,16 @@ from dataclasses import dataclass, field
 
 
 # ---------------------------------------------------------------------------
+# Embedding Model Selection
+# ---------------------------------------------------------------------------
+# Environment: SURVILAI_EMBEDDING_MODEL
+# - "survilface": SurvilFaceNet v1 (original, optimized for faces)
+# - "yolo26": YOLO26 (YOLOv8) internal features (experimental)
+
+EMBEDDING_MODEL: str = "yolo26"  # default; override with env var
+
+
+# ---------------------------------------------------------------------------
 # Detection thresholds
 # ---------------------------------------------------------------------------
 
