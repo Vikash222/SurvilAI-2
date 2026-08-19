@@ -50,3 +50,6 @@ __pycache__/
 runs/
 snapshots/
 my_photos/
+
+# Training outputs
+runs/
